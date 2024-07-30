@@ -24,10 +24,11 @@ ozone <-
     arithmetic_mean =
       if_else(
         rnorm(length(arithmetic_mean)) > 2.5,
-        arithmetic_mean + 0.2,
+        arithmetic_mean + 0.05,
         arithmetic_mean
       ),
-    id = row_number()
+    id = row_number(),
+    flag = 0L
   ) |>
   select(id, everything())
 

@@ -4,102 +4,83 @@ library(ggplot2)
 library(DBI)
 library(DT)
 library(plotly)
+library(plu)
 
-ui <- page_fillable(
+source("R/plot.R")
+source("R/table.R")
+source("R/data.R")
+
+choices <-
+  c(
+    "Date" = "date_local",
+    "PPM" = "ppm",
+    "AQI" = "aqi"
+  )
+
+ui <- page_fluid(
   layout_columns(
     card(
       card_header("Outliers"),
       markdown("Change `Flag` to `1` to flag a value as an error."),
-      DTOutput("table"),
+      card(DTOutput("table")),
       actionButton("write_data", "Write to database", width = "50%"),
     ),
-    card(plotlyOutput("plot"))
+    card(
+      layout_columns(
+        selectInput(
+          "plot_x",
+          "X-axis variable:",
+          choices = choices
+        ),
+        selectInput(
+          "plot_y",
+          "Y-axis variable:",
+          choices = choices[choices != "date_local"]
+        )
+      ),
+      card(plotlyOutput("plot"))
+    )
   )
 )
 
 server <- function(input, output, session) {
-  # Connect to DuckDB
   con <- dbConnect(duckdb::duckdb(), dbdir = "data/ozone.duckdb")
+  ozone <-
+    dplyr::tbl(con, "ozone") |>
+    collect() |>
+    rename(ppm = arithmetic_mean)
 
-  # Query data from DuckDB
-  #data <- reactive({
-    ozone <- dplyr::tbl(con, "ozone") |> collect()
-  #})
-
-
-  #outliers <- reactive({
-    # data_df <- data()
-    # iqr_bound <- 1.5 * IQR(data_df$arithmetic_mean)
-    # q1 <- quantile(data_df$arithmetic_mean, 0.25)
-    # q3 <- quantile(data_df$arithmetic_mean, 0.75)
-    iqr_bound <- 1.5 * IQR(ozone$arithmetic_mean)
-    q1 <- quantile(ozone$arithmetic_mean, 0.25)
-    q3 <- quantile(ozone$arithmetic_mean, 0.75)
-    outliers <-
-      #data_df |>
-      ozone |>
-      filter(
-        arithmetic_mean > (q3 + iqr_bound) |
-          arithmetic_mean < (q1 - iqr_bound)
-      )
- # })
+  outliers <- create_outliers(ozone)
 
   selectedRow <- reactiveVal(NULL)
 
-  # Plot data
-  output$plot <- renderPlotly({
-    p <-
-      ggplot(mapping = aes(date_local, arithmetic_mean)) +
-      geom_point(
-        # data = data() |> anti_join(outliers(), by = join_by("id")),
-        data = ozone |> anti_join(outliers, by = join_by("id")),
-        alpha = 0.4,
-        size = 2
-      ) +
-      geom_point(
-        # data = outliers(),
-        data = outliers,
-        alpha = 0.4,
-        size = 2,
-        color = "red"
-      ) +
-      theme_minimal() +
-      labs(
-        x = "Date",
-        y = "Mean ppm"
-      )
+  # Reactive value to store the edited data
+  edited_data <- reactiveVal(outliers)
 
-    ggplotly(p) |>
-      event_register("plotly_click")
-  })
+  # Capture edits made in the DataTable
+  observeEvent(
+    input$table_cell_edit,
+    {
+      edited_cell <- input$table_cell_edit
+      edited <- edited_data()
+      edited[edited_cell$row, "flag"] <- as.integer(edited_cell$value)
+      edited_data(edited) # Update with new data
+    }
+  )
+
+  # Plot data
+  output$plot <-
+    renderPlotly({
+      plot_ozone(input, ozone, edited_data(), plotly_event = "plotly_click")
+    })
 
   # Editable datatable
   output$table <- renderDT({
-    datatable(
-      #outliers() |>
-      outliers |>
-        select(
-          State = state_name,
-          Date = date_local,
-          PPM = arithmetic_mean
-        ) |>
-        mutate(Flag = 0L, PPM = round(PPM, 2)),
-      options =
-        list(
-          searching = FALSE,
-          lengthChange = FALSE,
-          info = FALSE,
-          paging = FALSE,
-          scrolly = "400px"
-        ),
-      editable =
-        list(target = "cell", disable = list(columns = 1:4)),
-      rownames = FALSE
-    )
+    create_editable_table(edited_data())
   })
 
-
   observeEvent(event_data("plotly_click"), {
+
     data_click <- event_data("plotly_click")
     if (is.null(data_click)) return(NULL)
 
@@ -114,10 +95,56 @@ server <- function(input, output, session) {
     selectRows(proxy, selected)
   })
 
+  # Write data to database on button click
+  observeEvent(
+    input$write_data, {
+      tryCatch(
+        {
+          dbBegin(con)
+
+          rows_changed <-
+            outliers |>
+            left_join(
+              edited_data(),
+              by = join_by("id"),
+              suffix = c("_old", "_new")
+            ) |>
+            filter(flag_old != flag_new) |>
+            select(id, flag_new)
+
+
+          for (id in rows_changed$id) {
+            dbExecute(
+              con,
+              "UPDATE ozone SET flag = ? WHERE id = ?",
+              params = list(rows_changed$flag_new[rows_changed$id == id], id)
+            )
+          }
+
+          n_changes <- nrow(rows_changed)
+
+          showNotification(
+            markdown(
+              glue::glue(
+                "{n_changes} `Flag` {plu::ral('value', n_changes[n_changes == 1])} successfully updated in database."
+              )
+            ),
+            type = "message"
+          )
+
+          dbCommit(con)
+        },
+        error = function(e) {
+          dbRollback(con)
+          showNotification("Error: Failed to update database.", type = "error")
+        }
+      )
+    }
+  )
 
   # Disconnect from DuckDB when the app stops
   onSessionEnded(function() {
-    dbDisconnect(con, shutdown = TRUE)
+    dbDisconnect(con)
   })
 }
 
