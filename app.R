@@ -5,6 +5,7 @@ library(DBI)
 library(DT)
 library(plotly)
 library(plu)
+library(dplyr)
 
 source("R/plot.R")
 source("R/table.R")
