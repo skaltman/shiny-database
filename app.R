@@ -11,6 +11,14 @@ source("R/plot.R")
 source("R/table.R")
 source("R/data.R")
 
+initialize_database <- function(con, source_db, table) {
+  source_con <- dbConnect(duckdb::duckdb(), dbdir = source_db)
+  ozone <- dbReadTable(source_con, table)
+  dbDisconnect(source_con)
+
+  dbWriteTable(con, table, ozone)
+}
+
 choices <-
   c(
     "Date" = "date_local",
@@ -47,7 +55,11 @@ ui <- page_fluid(
 )
 
 server <- function(input, output, session) {
-  con <- dbConnect(duckdb::duckdb(), dbdir = "data/ozone.duckdb")
+
+  con <- dbConnect(duckdb::duckdb(), dbdir = ":memory:")
+
+  initialize_database(con, "data/ozone.duckdb", table = "ozone")
+
   ozone <-
     dplyr::tbl(con, "ozone") |>
     collect() |>
