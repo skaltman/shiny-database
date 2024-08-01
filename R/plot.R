@@ -1,3 +1,10 @@
+choices <-
+  c(
+    "Date" = "date_local",
+    "PPM" = "ppm",
+    "AQI" = "aqi"
+  )
+
 plot_ozone <- function(input, ozone, outliers, plotly_event) {
   p <-
     ggplot(mapping = aes_string(input$plot_x, input$plot_y)) +

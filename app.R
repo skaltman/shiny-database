@@ -19,15 +19,11 @@ choices <-
   )
 
 ui <- page_fluid(
-  layout_columns(
+  markdown("## Identify outliers in air quality data"),
+  layout_column_wrap(
     card(
-      card_header("Outliers"),
-      markdown("Change `Flag` to `1` to flag a value as an error."),
-      card(DTOutput("table")),
-      actionButton("write_data", "Write to database", width = "50%"),
-    ),
-    card(
-      layout_columns(
+      card_header("Click on an outlier to highlight the point in the table."),
+      layout_column_wrap(
         selectInput(
           "plot_x",
           "X-axis variable:",
@@ -39,10 +35,13 @@ ui <- page_fluid(
           choices = choices[choices != "date_local"]
         )
       ),
-      card(
-        card_header("Click on an outlier to highlight the point in the table."),
-        plotlyOutput("plot")
-      )
+      plotlyOutput("plot"),
+      full_screen = TRUE
+    ),
+    card(
+      card_header(markdown("Change `Flag` to `1` to flag a value as an error.")),
+      DTOutput("table"),
+      actionButton("write_data", "Write to database", width = "50%")
     )
   )
 )
