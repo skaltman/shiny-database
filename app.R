@@ -66,8 +66,19 @@ server <- function(input, output, session) {
     {
       edited_cell <- input$table_cell_edit
       edited <- edited_data()
-      edited[edited_cell$row, "flag"] <- as.integer(edited_cell$value)
-      edited_data(edited) # Update with new data
+
+      new_flag_value <- as.integer(edited_cell$value)
+      if (new_flag_value > 1 || new_flag_value < 0) {
+        showNotification(
+          markdown("Error: `flag` must be either `0` or `1`."),
+          type = "error"
+        )
+      }
+
+      else {
+        edited[edited_cell$row, "flag"] <- new_flag_value
+        edited_data(edited) # Update with new data
+      }
     }
   )
 
