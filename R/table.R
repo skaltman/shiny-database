@@ -16,9 +16,9 @@ create_editable_table <- function(data) {
         lengthChange = FALSE,
         info = FALSE,
         paging = FALSE,
-        scrollY = "400px"  # Fixed scroll area height
+        scrollY = "400px"
       ),
-    editable = list(target = "cell", columns = 4),  # Make only flag column editable
+    editable = list(target = "cell", disable = list(columns = c(0:3))),
     rownames = FALSE
   )
 }

@@ -38,7 +38,10 @@ ui <- page_fluid(
           choices = choices[choices != "date_local"]
         )
       ),
-      card(plotlyOutput("plot"))
+      card(
+        card_header("Click on an outlier to highlight the point in the table."),
+        plotlyOutput("plot")
+      )
     )
   )
 )
