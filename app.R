@@ -47,7 +47,11 @@ ui <- page_fluid(
       full_screen = TRUE
     ),
     card(
-      card_header(markdown("Change `Flag` to `1` to flag a value as an error.")),
+      card_header(
+        markdown(
+          "Change `Flag` to `1` to flag a value as an error. Flagged points will appear red in the plot."
+        )
+      ),
       DTOutput("table"),
       actionButton("write_data", "Write to database", width = "50%")
     )
