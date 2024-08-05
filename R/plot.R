@@ -31,6 +31,7 @@ plot_ozone <- function(input, ozone, outliers, plotly_event) {
     )
 
   ggplotly(p) |>
-    event_register(plotly_event)
+    event_register(plotly_event) |>
+    config(displayModeBar = FALSE)
 }
 
