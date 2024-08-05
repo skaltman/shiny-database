@@ -74,14 +74,16 @@ server <- function(input, output, session) {
   selectedRow <- reactiveVal(NULL)
 
   # Reactive value to store the edited data
-  edited_data <- reactiveVal(outliers)
+  table_data <- reactiveVal(outliers)
+  plot_data <- reactiveVal(outliers)
 
-  # Capture edits made in the DataTable
+  # Capture edits made in the DataTable so that plot can be updated
   observeEvent(
     input$table_cell_edit,
     {
       edited_cell <- input$table_cell_edit
-      edited <- edited_data()
+      # edited <- table_data()
+      new_plot_data <- plot_data()
 
       new_flag_value <- as.integer(edited_cell$value)
       if (new_flag_value > 1 || new_flag_value < 0) {
@@ -92,8 +94,9 @@ server <- function(input, output, session) {
       }
 
       else {
-        edited[edited_cell$row, "flag"] <- new_flag_value
-        edited_data(edited) # Update with new data
+        new_plot_data[edited_cell$row, "flag"] <- new_flag_value
+        plot_data(new_plot_data)
+        #table_data(edited) # Update with new data
       }
     }
   )
@@ -101,12 +104,12 @@ server <- function(input, output, session) {
   # Plot data
   output$plot <-
     renderPlotly({
-      plot_ozone(input, ozone, edited_data(), plotly_event = "plotly_click")
+      plot_ozone(input, ozone, plot_data(), plotly_event = "plotly_click")
     })
 
   # Editable datatable
   output$table <- renderDT({
-    create_editable_table(edited_data())
+    create_editable_table(table_data())
   })
 
   observeEvent(event_data("plotly_click"), {
@@ -132,10 +135,13 @@ server <- function(input, output, session) {
         {
           dbBegin(con)
 
+          # Update table data reactive with edited values
+          table_data(plot_data())
+
           rows_changed <-
             outliers |>
             left_join(
-              edited_data(),
+              table_data(),
               by = join_by("id"),
               suffix = c("_old", "_new")
             ) |>
